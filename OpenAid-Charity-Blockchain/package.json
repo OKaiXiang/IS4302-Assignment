@@ -7,7 +7,11 @@
     "build": "hardhat build",
     "test": "hardhat test",
     "test:mocha": "hardhat test mocha",
-    "coverage": "hardhat test --coverage"
+    "coverage": "hardhat test --coverage",
+    "frontend": "vite frontend --host 127.0.0.1",
+    "frontend:build": "vite build frontend",
+    "frontend:preview": "vite preview frontend --host 127.0.0.1",
+    "frontend:config": "node scripts/export-frontend-config.mjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "latest",
@@ -18,6 +22,7 @@
     "@types/mocha": "latest",
     "chai": "latest",
     "ethers": "latest",
-    "mocha": "latest"
+    "mocha": "latest",
+    "vite": "latest"
   }
 }

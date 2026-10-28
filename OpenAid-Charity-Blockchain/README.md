@@ -97,3 +97,63 @@ For a classroom demo, a campaign can use:
 - categories: `Food`, `Medical`, `Shelter`, etc.
 
 These are prototype parameters, not recommendations for handling real charitable funds.
+
+## Simple frontend
+
+A browser frontend is included under `frontend/`. It uses MetaMask + ethers.js and can:
+
+- connect to a wallet and add the local Hardhat network;
+- load the deployed `CharityFactory` and `CharityRegistry`;
+- verify/unverify charity addresses (registry admin only);
+- create charity campaigns;
+- browse campaigns and category balances;
+- donate to a selected category;
+- propose evidence-backed expenses (charity only);
+- vote YES/NO as a donor oracle;
+- raise disputes;
+- finalize votes and execute approved payouts;
+- close expired campaigns and claim proportional refunds.
+
+### Run the full local demo
+
+Use three terminals.
+
+**Terminal 1 — local blockchain**
+
+```bash
+npm install
+npx hardhat node
+```
+
+Hardhat will print funded development accounts and private keys. Import one or more of these **development-only** accounts into MetaMask when you want to act as the registry admin, charity, donor, or recipient. Never reuse these test keys on a real network.
+
+**Terminal 2 — deploy contracts and configure frontend**
+
+```bash
+npx hardhat ignition deploy ignition/modules/OpenAid.ts --network localhost
+npm run frontend:config
+```
+
+The second command reads `ignition/deployments/chain-31337/deployed_addresses.json` and writes the local factory address into `frontend/config.js`.
+
+**Terminal 3 — frontend**
+
+```bash
+npm run frontend
+```
+
+Open the URL printed by Vite (normally `http://127.0.0.1:5173`). Click **Add Hardhat Network** and **Connect MetaMask**.
+
+### Suggested demo roles
+
+The first Hardhat account that deploys `CharityRegistry` is the registry admin. A simple demonstration is:
+
+1. Connect with the admin account and verify a second account as a charity.
+2. Switch MetaMask to the charity account and create a campaign.
+3. Switch to several donor accounts and donate to the same category.
+4. After the funding deadline, switch to the charity and propose an expense with an evidence URI/hash.
+5. Switch to donor accounts and vote YES/NO or raise a dispute.
+6. After the voting deadline, finalize the vote and execute an approved expense.
+7. After the campaign deadline, close the campaign and let donors claim unused funds.
+
+Because the Solidity contract intentionally uses real block timestamps, use short funding/voting periods for a live UI demo. Your unit tests can still use Hardhat network helpers to jump time instantly.

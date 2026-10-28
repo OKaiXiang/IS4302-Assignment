@@ -1,18 +1,31 @@
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
+const compilerSettings = {
+  optimizer: {
+    enabled: true,
+    runs: 200,
+  },
+  viaIR: true,
+};
+
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers],
+
   solidity: {
-    version: "0.8.34",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    profiles: {
+      default: {
+        version: "0.8.34",
+        settings: compilerSettings,
       },
-      viaIR: true,
+
+      production: {
+        version: "0.8.34",
+        settings: compilerSettings,
+      },
     },
   },
+
   test: {
     mocha: {
       timeout: 20_000,

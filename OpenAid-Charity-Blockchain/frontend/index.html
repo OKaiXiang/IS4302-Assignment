@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenAid — Transparent Charity Donations</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">♥</div>
+        <div>
+          <h1>OpenAid</h1>
+          <p>Transparent, donor-governed charity spending</p>
+        </div>
+      </div>
+      <div class="wallet-actions">
+        <button id="addNetworkBtn" class="button secondary">Add Hardhat Network</button>
+        <button id="connectBtn" class="button primary">Connect MetaMask</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card full">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Connection</p>
+            <h2>Contract setup</h2>
+          </div>
+          <span id="networkBadge" class="badge">Not connected</span>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Factory contract address
+            <div class="input-row">
+              <input id="factoryAddressInput" placeholder="0x..." autocomplete="off" />
+              <button id="loadFactoryBtn" class="button secondary">Load</button>
+            </div>
+          </label>
+          <div class="summary-box">
+            <span>Connected wallet</span>
+            <strong id="walletAddress">—</strong>
+            <span>Registry</span>
+            <strong id="registryAddress">—</strong>
+          </div>
+        </div>
+        <p class="hint">After deploying with Hardhat Ignition, run <code>npm run frontend:config</code> to fill the local factory address automatically.</p>
+        <div id="status" class="status info">Connect MetaMask, then load the factory contract.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Registry admin</p>
+            <h2>Verify a charity</h2>
+          </div>
+        </div>
+        <label>
+          Charity wallet
+          <input id="verifyCharityAddress" placeholder="0x..." />
+        </label>
+        <div class="button-row">
+          <button id="verifyCharityBtn" class="button primary">Verify</button>
+          <button id="unverifyCharityBtn" class="button danger">Remove verification</button>
+        </div>
+        <p id="adminInfo" class="hint">Load the factory to see the registry admin.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Verified charity</p>
+            <h2>Create campaign</h2>
+          </div>
+        </div>
+        <div class="form-stack">
+          <label>Title <input id="campaignTitle" value="Flood Relief 2026" /></label>
+          <label>Description URI <input id="campaignDescription" value="ipfs://campaign-metadata" /></label>
+          <div class="grid two">
+            <label>Funding closes in (minutes) <input id="fundingMinutes" type="number" min="1" value="10" /></label>
+            <label>Campaign closes in (minutes) <input id="campaignMinutes" type="number" min="3" value="60" /></label>
+          </div>
+          <div class="grid two">
+            <label>Voting period (minutes) <input id="votingMinutes" type="number" min="1" value="5" /></label>
+            <label>Minimum donation (ETH) <input id="minDonation" type="number" min="0" step="0.01" value="0.1" /></label>
+          </div>
+          <div class="grid two">
+            <label>Quorum (%) <input id="quorumPercent" type="number" min="1" max="100" value="50" /></label>
+            <label>Approval threshold (%) <input id="approvalPercent" type="number" min="1" max="100" value="60" /></label>
+          </div>
+          <label>Categories (comma separated) <input id="categoryNames" value="Food, Medical" /></label>
+          <button id="createCampaignBtn" class="button primary">Create campaign</button>
+        </div>
+      </section>
+
+      <section class="card full">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Campaign explorer</p>
+            <h2>Campaigns</h2>
+          </div>
+          <button id="refreshCampaignsBtn" class="button secondary">Refresh</button>
+        </div>
+        <div id="campaignList" class="campaign-list empty-state">No campaigns loaded.</div>
+      </section>
+
+      <section id="campaignPanel" class="card full hidden">
+        <div class="section-heading campaign-heading">
+          <div>
+            <p class="eyebrow">Selected campaign</p>
+            <h2 id="selectedCampaignTitle">—</h2>
+            <p id="selectedCampaignAddress" class="mono muted"></p>
+          </div>
+          <div class="button-row">
+            <button id="refreshCampaignBtn" class="button secondary">Refresh campaign</button>
+            <button id="closeCampaignBtn" class="button danger">Close expired campaign</button>
+          </div>
+        </div>
+
+        <div id="campaignStats" class="stats-grid"></div>
+
+        <div class="subsection">
+          <h3>Donation categories</h3>
+          <div id="categoryCards" class="category-grid"></div>
+        </div>
+
+        <div class="grid two section-gap">
+          <div class="panel">
+            <h3>Donate</h3>
+            <div class="form-stack">
+              <label>Category <select id="donateCategory"></select></label>
+              <label>Amount (ETH) <input id="donationAmount" type="number" step="0.01" value="1" /></label>
+              <button id="donateBtn" class="button primary">Donate</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Claim unused funds</h3>
+            <p class="hint">Available only after the campaign deadline and after the campaign is closed.</p>
+            <div class="form-stack">
+              <label>Category <select id="refundCategory"></select></label>
+              <button id="claimRefundBtn" class="button secondary">Claim refund</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel section-gap">
+          <h3>Propose expense <span class="muted small">(charity wallet only)</span></h3>
+          <div class="grid two">
+            <label>Category <select id="expenseCategory"></select></label>
+            <label>Recipient wallet <input id="expenseRecipient" placeholder="0x..." /></label>
+            <label>Amount (ETH) <input id="expenseAmount" type="number" step="0.01" value="0.5" /></label>
+            <label>Evidence URI <input id="evidenceUri" value="ipfs://invoice-and-proof" /></label>
+          </div>
+          <label>Description <input id="expenseDescription" value="Purchase emergency supplies" /></label>
+          <label>
+            Evidence hash or text to hash
+            <input id="evidenceHash" value="invoice-v1" />
+          </label>
+          <p class="hint">If this field is not a 32-byte hex value, the frontend hashes the text with keccak256 before submitting.</p>
+          <button id="proposeExpenseBtn" class="button primary">Propose expense</button>
+        </div>
+
+        <div class="subsection section-gap">
+          <div class="section-heading compact">
+            <h3>Expenses and donor oracle voting</h3>
+            <span class="hint">One eligible donor wallet = one vote.</span>
+          </div>
+          <div id="expenseList" class="expense-list empty-state">No expenses yet.</div>
+        </div>
+      </section>
+    </main>
+
+    <template id="expenseTemplate">
+      <article class="expense-card">
+        <div class="expense-top">
+          <div>
+            <span class="badge expense-status"></span>
+            <h4 class="expense-title"></h4>
+          </div>
+          <div class="expense-amount"></div>
+        </div>
+        <dl class="detail-grid"></dl>
+        <div class="vote-meter">
+          <div class="vote-copy"></div>
+          <div class="meter"><span></span></div>
+        </div>
+        <div class="expense-actions"></div>
+      </article>
+    </template>
+
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
