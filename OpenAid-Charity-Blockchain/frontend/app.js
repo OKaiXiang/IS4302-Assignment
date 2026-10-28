@@ -46,11 +46,14 @@ const CAMPAIGN_ABI = [
 ];
 
 const STATUS_NAMES = ["None", "Voting", "Approved", "Rejected", "Paid"];
-const HARDHAT_CHAIN_ID = "0x7a69"; // 31337
+const HARDHAT_CHAIN_ID = 31337n;
+const RPC_URL = "http://127.0.0.1:8545";
+const ROLE_NAMES = ["Admin", "Charity", "Alice · Donor", "Bob · Donor", "Charlie · Donor", "Supplier"];
 
 let provider;
 let signer;
 let account = "";
+let accountIndex = 0;
 let factory;
 let registry;
 let factoryAddress = "";
@@ -79,6 +82,27 @@ function formatDate(timestamp) {
   return new Date(Number(timestamp) * 1000).toLocaleString();
 }
 
+async function refreshBlockTime() {
+  if (!provider) return null;
+
+  // Get the latest block directly from Hardhat
+  const latestBlock = await provider.send(
+    "eth_getBlockByNumber",
+    ["latest", false]
+  );
+
+  if (!latestBlock) {
+    throw new Error("Could not read the latest Hardhat block.");
+  }
+
+  const timestamp = Number(BigInt(latestBlock.timestamp));
+
+  $("blockTimestamp").textContent = String(timestamp);
+  $("blockTime").textContent = formatDate(timestamp);
+
+  return timestamp;
+}
+
 function toEvidenceHash(value) {
   const trimmed = value.trim();
   if (ethers.isHexString(trimmed, 32)) return trimmed;
@@ -102,62 +126,85 @@ function getErrorMessage(error) {
   return raw.replace(/^execution reverted:\s*/i, "");
 }
 
-async function ensureWallet() {
-  if (!window.ethereum) throw new Error("MetaMask was not found in this browser.");
-  if (!provider) provider = new ethers.BrowserProvider(window.ethereum);
-  if (!signer) signer = await provider.getSigner();
-  account = await signer.getAddress();
-  $("walletAddress").textContent = account;
-  return signer;
-}
-
-async function connectWallet() {
+async function connectLocalHardhat() {
   try {
-    if (!window.ethereum) throw new Error("Install MetaMask first.");
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    provider = new ethers.BrowserProvider(window.ethereum);
-    signer = await provider.getSigner();
-    account = await signer.getAddress();
-    $("walletAddress").textContent = account;
+    setStatus("Connecting directly to Hardhat localhost…");
+    provider = new ethers.JsonRpcProvider(window.OPENAID_CONFIG?.rpcUrl || RPC_URL);
     const network = await provider.getNetwork();
-    $("networkBadge").textContent = `Chain ${network.chainId}`;
-    setStatus(`Wallet connected: ${shortAddress(account)}`, "success");
+    if (network.chainId !== HARDHAT_CHAIN_ID) {
+      throw new Error(`Expected Hardhat chain 31337, but RPC returned chain ${network.chainId}.`);
+    }
+
+    const accounts = await provider.send("eth_accounts", []);
+    if (!accounts.length) throw new Error("Hardhat node returned no unlocked accounts.");
+
+    const select = $("accountSelect");
+    select.innerHTML = accounts.slice(0, 10).map((address, index) => {
+      const role = ROLE_NAMES[index] || `Hardhat Account ${index}`;
+      return `<option value="${index}">${escapeHtml(role)} — ${escapeHtml(shortAddress(address))}</option>`;
+    }).join("");
+
+    accountIndex = Math.min(Number(select.value || 0), accounts.length - 1);
+    select.value = String(accountIndex);
+    await switchAccount(accountIndex, false);
+    await refreshBlockTime();
+
+    $("networkBadge").textContent = `Hardhat ${network.chainId}`;
+    setStatus("Connected directly to the local Hardhat node. No MetaMask required.", "success");
+
     if ($("factoryAddressInput").value.trim()) await loadFactory();
   } catch (error) {
-    setStatus(getErrorMessage(error), "error");
+    setStatus(`Could not connect to Hardhat: ${getErrorMessage(error)}. Make sure "npx hardhat node" is running.`, "error");
   }
 }
 
-async function addHardhatNetwork() {
-  try {
-    if (!window.ethereum) throw new Error("Install MetaMask first.");
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: HARDHAT_CHAIN_ID }],
-      });
-    } catch (switchError) {
-      if (switchError?.code !== 4902) throw switchError;
-      await window.ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: HARDHAT_CHAIN_ID,
-          chainName: "Hardhat Localhost",
-          nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-          rpcUrls: ["http://127.0.0.1:8545"],
-        }],
-      });
+async function switchAccount(index, refresh = true) {
+  if (!provider) throw new Error("Connect to Hardhat first.");
+  accountIndex = Number(index);
+  signer = await provider.getSigner(accountIndex);
+  account = await signer.getAddress();
+  const balance = await provider.getBalance(account);
+  $("walletAddress").textContent = account;
+  $("accountBalance").textContent = formatEth(balance);
+  $("activeRole").textContent = ROLE_NAMES[accountIndex] || `Hardhat Account ${accountIndex}`;
+
+  await refreshBlockTime();
+
+  if (factoryAddress) {
+    factory = new ethers.Contract(factoryAddress, FACTORY_ABI, signer);
+    const registryAddress = await factory.registry();
+    registry = new ethers.Contract(registryAddress, REGISTRY_ABI, signer);
+    const admin = await registry.admin();
+    const verified = await registry.isVerifiedCharity(account);
+    $("adminInfo").textContent = `Registry admin: ${admin}. Current account verified as charity: ${verified ? "yes" : "no"}.`;
+    if (selectedCampaignAddress) {
+      selectedCampaign = new ethers.Contract(selectedCampaignAddress, CAMPAIGN_ABI, signer);
     }
-    setStatus("MetaMask is connected to the Hardhat localhost network.", "success");
-    await connectWallet();
+  }
+
+  if (refresh) {
+    setStatus(`Now acting as ${ROLE_NAMES[accountIndex] || `Account ${accountIndex}`} (${shortAddress(account)}).`, "success");
+    if (factory) await refreshCampaigns();
+    if (selectedCampaign) await refreshSelectedCampaign();
+  }
+}
+
+async function advanceTime(seconds) {
+  if (!provider) return setStatus("Connect to Hardhat first.", "error");
+  try {
+    await provider.send("evm_increaseTime", [seconds]);
+    await provider.send("evm_mine", []);
+    await refreshBlockTime();
+    setStatus(`Advanced local Hardhat time by ${Math.round(seconds / 60)} minute(s).`, "success");
+    if (selectedCampaign) await refreshSelectedCampaign();
+    if (factory) await refreshCampaigns();
   } catch (error) {
-    setStatus(getErrorMessage(error), "error");
+    setStatus(`Advance time failed: ${getErrorMessage(error)}`, "error");
   }
 }
 
 async function loadFactory() {
   try {
-    await ensureWallet();
     const value = $("factoryAddressInput").value.trim();
     if (!ethers.isAddress(value)) throw new Error("Enter a valid factory contract address.");
 
@@ -187,10 +234,11 @@ async function loadFactory() {
 
 async function runTransaction(label, action, after) {
   try {
-    setStatus(`${label}: waiting for wallet confirmation…`);
+    setStatus(`${label}: sending transaction from ${shortAddress(account)}…`);
     const tx = await action();
     setStatus(`${label}: transaction submitted (${shortAddress(tx.hash)}).`);
     await tx.wait();
+    await refreshBlockTime();
     setStatus(`${label}: confirmed.`, "success");
     if (after) await after();
   } catch (error) {
@@ -212,7 +260,11 @@ async function updateCharityVerification(verified) {
 
 async function createCampaign() {
   if (!factory) return setStatus("Load the factory first.", "error");
-  const now = Math.floor(Date.now() / 1000);
+  const now = await refreshBlockTime();
+
+  if (now === null) {
+    return setStatus("Connect to Hardhat first.", "error");
+  }
   const fundingMinutes = Number($("fundingMinutes").value);
   const campaignMinutes = Number($("campaignMinutes").value);
   const votingMinutes = Number($("votingMinutes").value);
@@ -333,7 +385,7 @@ async function refreshSelectedCampaign() {
     $("selectedCampaignTitle").textContent = title;
     $("selectedCampaignAddress").textContent = selectedCampaignAddress;
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = await refreshBlockTime();
     const phase = closed ? "Closed" : now < Number(fundingDeadline) ? "Funding" : now <= Number(campaignDeadline) ? "Spending / voting" : "Expired — ready to close";
     $("campaignStats").innerHTML = [
       ["Phase", phase],
@@ -352,7 +404,7 @@ async function refreshSelectedCampaign() {
 
     renderCategories(categories);
     populateCategorySelects(categories);
-    await renderExpenses(Number(expenseCount));
+    await renderExpenses(Number(expenseCount), now);
   } catch (error) {
     setStatus(getErrorMessage(error), "error");
   }
@@ -415,7 +467,7 @@ async function proposeExpense() {
   );
 }
 
-async function renderExpenses(count) {
+async function renderExpenses(count, now) {
   const container = $("expenseList");
   container.innerHTML = "";
   container.className = "expense-list";
@@ -436,7 +488,6 @@ async function renderExpenses(count) {
     const totalVotes = Number(expense.yesVotes + expense.noVotes);
     const yesPercent = totalVotes ? Math.round(Number(expense.yesVotes) * 100 / totalVotes) : 0;
     const status = STATUS_NAMES[Number(expense.status)] || "Unknown";
-    const now = Math.floor(Date.now() / 1000);
 
     const node = $("expenseTemplate").content.firstElementChild.cloneNode(true);
     const statusNode = node.querySelector(".expense-status");
@@ -525,8 +576,10 @@ function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
-$("connectBtn").addEventListener("click", connectWallet);
-$("addNetworkBtn").addEventListener("click", addHardhatNetwork);
+$("connectLocalBtn").addEventListener("click", connectLocalHardhat);
+$("accountSelect").addEventListener("change", (event) => switchAccount(Number(event.target.value)));
+$("advance2Btn").addEventListener("click", () => advanceTime(2 * 60));
+$("advance10Btn").addEventListener("click", () => advanceTime(10 * 60));
 $("loadFactoryBtn").addEventListener("click", loadFactory);
 $("verifyCharityBtn").addEventListener("click", () => updateCharityVerification(true));
 $("unverifyCharityBtn").addEventListener("click", () => updateCharityVerification(false));
@@ -538,15 +591,7 @@ $("proposeExpenseBtn").addEventListener("click", proposeExpense);
 $("closeCampaignBtn").addEventListener("click", closeCampaign);
 $("claimRefundBtn").addEventListener("click", claimRefund);
 
-if (window.ethereum) {
-  window.ethereum.on("accountsChanged", async () => {
-    provider = undefined;
-    signer = undefined;
-    await connectWallet();
-    if (selectedCampaignAddress) await selectCampaign(selectedCampaignAddress);
-  });
-  window.ethereum.on("chainChanged", () => window.location.reload());
-}
-
 const configuredAddress = window.OPENAID_CONFIG?.factoryAddress || localStorage.getItem("openaid.factoryAddress") || "";
 if (configuredAddress) $("factoryAddressInput").value = configuredAddress;
+
+connectLocalHardhat();

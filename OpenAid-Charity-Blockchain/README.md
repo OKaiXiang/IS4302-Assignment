@@ -100,9 +100,23 @@ These are prototype parameters, not recommendations for handling real charitable
 
 ## Simple frontend
 
-A browser frontend is included under `frontend/`. It uses MetaMask + ethers.js and can:
+A browser frontend is included under `frontend/`. For the coursework demo it connects **directly to the local Hardhat JSON-RPC node**, so MetaMask is not required.
 
-- connect to a wallet and add the local Hardhat network;
+The page provides a role/account selector using Hardhat's unlocked development accounts:
+
+- Account 0 — Admin
+- Account 1 — Charity
+- Account 2 — Alice (Donor)
+- Account 3 — Bob (Donor)
+- Account 4 — Charlie (Donor)
+- Account 5 — Supplier
+
+Changing the selector changes the Ethers.js signer, which means Solidity sees the selected account as `msg.sender`.
+
+The frontend can:
+
+- connect directly to `http://127.0.0.1:8545`;
+- switch between local Hardhat accounts without private-key setup;
 - load the deployed `CharityFactory` and `CharityRegistry`;
 - verify/unverify charity addresses (registry admin only);
 - create charity campaigns;
@@ -112,7 +126,8 @@ A browser frontend is included under `frontend/`. It uses MetaMask + ethers.js a
 - vote YES/NO as a donor oracle;
 - raise disputes;
 - finalize votes and execute approved payouts;
-- close expired campaigns and claim proportional refunds.
+- close expired campaigns and claim proportional refunds; and
+- advance the local Hardhat clock by 2 or 10 minutes for easier demonstrations.
 
 ### Run the full local demo
 
@@ -125,7 +140,7 @@ npm install
 npx hardhat node
 ```
 
-Hardhat will print funded development accounts and private keys. Import one or more of these **development-only** accounts into MetaMask when you want to act as the registry admin, charity, donor, or recipient. Never reuse these test keys on a real network.
+Keep this terminal running. The frontend talks directly to this node on port `8545`.
 
 **Terminal 2 — deploy contracts and configure frontend**
 
@@ -142,18 +157,19 @@ The second command reads `ignition/deployments/chain-31337/deployed_addresses.js
 npm run frontend
 ```
 
-Open the URL printed by Vite (normally `http://127.0.0.1:5173`). Click **Add Hardhat Network** and **Connect MetaMask**.
+Open the URL printed by Vite (normally `http://127.0.0.1:5173`). The page automatically attempts to connect to the Hardhat node. No wallet extension or network setup is required.
 
-### Suggested demo roles
+### Suggested demo flow
 
-The first Hardhat account that deploys `CharityRegistry` is the registry admin. A simple demonstration is:
+1. Select **Admin** and verify Account 1 as a charity.
+2. Select **Charity** and create a campaign with a short funding period.
+3. Select **Alice**, **Bob**, and **Charlie** in turn and donate to the same category.
+4. Click **Advance 2 min** (or enough time to pass the funding deadline).
+5. Select **Charity** and propose an expense with evidence URI/hash.
+6. Select donor accounts and vote YES/NO or raise a dispute.
+7. Advance time past the voting deadline, finalize the vote, then execute an approved expense.
+8. Advance time past the campaign deadline, close the campaign, and let donors claim unused funds.
 
-1. Connect with the admin account and verify a second account as a charity.
-2. Switch MetaMask to the charity account and create a campaign.
-3. Switch to several donor accounts and donate to the same category.
-4. After the funding deadline, switch to the charity and propose an expense with an evidence URI/hash.
-5. Switch to donor accounts and vote YES/NO or raise a dispute.
-6. After the voting deadline, finalize the vote and execute an approved expense.
-7. After the campaign deadline, close the campaign and let donors claim unused funds.
+### Development-only warning
 
-Because the Solidity contract intentionally uses real block timestamps, use short funding/voting periods for a live UI demo. Your unit tests can still use Hardhat network helpers to jump time instantly.
+Directly using unlocked RPC accounts is convenient for a local Hardhat demonstration, but it is **not appropriate for a real deployment**. A production DApp should use user-controlled wallets or another secure signing mechanism rather than expose unlocked accounts through an RPC node.

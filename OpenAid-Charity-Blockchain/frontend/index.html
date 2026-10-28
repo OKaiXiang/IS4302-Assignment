@@ -16,8 +16,7 @@
         </div>
       </div>
       <div class="wallet-actions">
-        <button id="addNetworkBtn" class="button secondary">Add Hardhat Network</button>
-        <button id="connectBtn" class="button primary">Connect MetaMask</button>
+        <button id="connectLocalBtn" class="button primary">Connect Local Hardhat</button>
       </div>
     </header>
 
@@ -28,26 +27,44 @@
             <p class="eyebrow">Connection</p>
             <h2>Contract setup</h2>
           </div>
-          <span id="networkBadge" class="badge">Not connected</span>
+          <span id="networkBadge" class="badge">Hardhat disconnected</span>
         </div>
 
         <div class="grid two">
-          <label>
-            Factory contract address
-            <div class="input-row">
-              <input id="factoryAddressInput" placeholder="0x..." autocomplete="off" />
-              <button id="loadFactoryBtn" class="button secondary">Load</button>
+          <div class="form-stack">
+            <label>
+              Act as Hardhat account
+              <select id="accountSelect"><option value="0">Start the Hardhat node first</option></select>
+            </label>
+            <label>
+              Factory contract address
+              <div class="input-row">
+                <input id="factoryAddressInput" placeholder="0x..." autocomplete="off" />
+                <button id="loadFactoryBtn" class="button secondary">Load</button>
+              </div>
+            </label>
+            <div class="button-row">
+              <button id="advance2Btn" class="button secondary">Advance 2 min</button>
+              <button id="advance10Btn" class="button secondary">Advance 10 min</button>
             </div>
-          </label>
+          </div>
           <div class="summary-box">
-            <span>Connected wallet</span>
+            <span>Current role</span>
+            <strong id="activeRole">—</strong>
+            <span>Current account</span>
             <strong id="walletAddress">—</strong>
+            <span>Balance</span>
+            <strong id="accountBalance">—</strong>
+            <span>Block time</span>
+            <strong id="blockTime">—</strong>
+            <span>block.timestamp</span>
+            <strong id="blockTimestamp" class="mono">—</strong>
             <span>Registry</span>
             <strong id="registryAddress">—</strong>
           </div>
         </div>
-        <p class="hint">After deploying with Hardhat Ignition, run <code>npm run frontend:config</code> to fill the local factory address automatically.</p>
-        <div id="status" class="status info">Connect MetaMask, then load the factory contract.</div>
+        <p class="hint">No MetaMask is needed. The frontend uses Hardhat's unlocked localhost accounts directly. After deployment, run <code>npm run frontend:config</code> to fill the factory address automatically.</p>
+        <div id="status" class="status info">Connecting to Hardhat localhost…</div>
       </section>
 
       <section class="card">
