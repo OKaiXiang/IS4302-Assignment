@@ -1,0 +1,23 @@
+{
+  "name": "openaid-charity-blockchain",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "hardhat build",
+    "test": "hardhat test",
+    "test:mocha": "hardhat test mocha",
+    "coverage": "hardhat test --coverage"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "latest",
+    "@types/node": "latest",
+    "hardhat": "^3.21.1",
+    "typescript": "latest",
+    "@types/chai": "latest",
+    "@types/mocha": "latest",
+    "chai": "latest",
+    "ethers": "latest",
+    "mocha": "latest"
+  }
+}
