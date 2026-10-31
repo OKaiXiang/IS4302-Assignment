@@ -5,3 +5,4 @@ typechain-types/
 coverage/
 ignition/deployments/
 .env
+types/ethers-contracts/
