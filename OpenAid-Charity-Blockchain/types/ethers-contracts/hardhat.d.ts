@@ -10,20 +10,20 @@ import * as Contracts from "./index.js";
 
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
-  getContractFactory(name: 'CharityCampaign', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CharityCampaign__factory>
-getContractFactory(name: 'CharityFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CharityFactory__factory>
+  getContractFactory(name: 'CharityFactory', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CharityFactory__factory>
+getContractFactory(name: 'CharityCampaign', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CharityCampaign__factory>
 getContractFactory(name: 'CharityRegistry', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CharityRegistry__factory>
 
-  getContractAt(name: 'CharityCampaign', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CharityCampaign>
-getContractAt(name: 'CharityFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CharityFactory>
+  getContractAt(name: 'CharityFactory', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CharityFactory>
+getContractAt(name: 'CharityCampaign', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CharityCampaign>
 getContractAt(name: 'CharityRegistry', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CharityRegistry>
 
-  deployContract(name: 'CharityCampaign', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityCampaign>
-deployContract(name: 'CharityFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityFactory>
+  deployContract(name: 'CharityFactory', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityFactory>
+deployContract(name: 'CharityCampaign', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityCampaign>
 deployContract(name: 'CharityRegistry', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityRegistry>
 
-  deployContract(name: 'CharityCampaign', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityCampaign>
-deployContract(name: 'CharityFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityFactory>
+  deployContract(name: 'CharityFactory', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityFactory>
+deployContract(name: 'CharityCampaign', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityCampaign>
 deployContract(name: 'CharityRegistry', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CharityRegistry>
 
     // default types

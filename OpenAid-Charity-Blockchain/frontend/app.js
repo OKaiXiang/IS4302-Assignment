@@ -7,7 +7,7 @@ const FACTORY_ABI = [
   "function registry() view returns (address)",
   "function getCampaigns() view returns (address[])",
   "function getCampaignCount() view returns (uint256)",
-  "function createCampaign(string title,string descriptionURI,uint256 fundingDeadline,uint256 campaignDeadline,uint256 votingPeriod,uint256 quorumBps,uint256 approvalBps,uint256 minDonation,string[] categoryNames) returns (address campaignAddress)",
+  "function createCampaign(string title,string descriptionURI,uint256 fundingDeadline,uint256 campaignDeadline,uint256 votingPeriod,uint256 quorumBps,uint256 approvalBps,string[] categoryNames) returns (address campaignAddress)",
 ];
 
 const REGISTRY_ABI = [
