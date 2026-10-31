@@ -461,6 +461,7 @@ describe("OpenAid charity donation platform", function () {
 
       await expect(campaign.connect(outsider).executeExpense(1n))
         .to.changeEtherBalances(
+          ethers,
           [await campaign.getAddress(), supplier.address],
           [-ethers.parseEther("3"), ethers.parseEther("3")],
         );
@@ -533,11 +534,13 @@ describe("OpenAid charity donation platform", function () {
       await campaign.closeCampaign();
 
       await expect(campaign.connect(donor1).claimRefund(FOOD)).to.changeEtherBalance(
+        ethers,
         donor1,
         ethers.parseEther("1.5"),
       );
 
       await expect(campaign.connect(donor2).claimRefund(FOOD)).to.changeEtherBalance(
+        ethers,
         donor2,
         ethers.parseEther("0.5"),
       );
