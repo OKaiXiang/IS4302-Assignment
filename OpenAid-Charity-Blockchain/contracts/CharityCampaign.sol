@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
+import {CharityRegistry} from "./CharityRegistry.sol";
 
 /**
  * @title CharityCampaign
@@ -52,6 +53,8 @@ contract CharityCampaign {
     }
 
     address public immutable charity;
+    CharityRegistry public immutable registry;
+    uint256 public immutable creationRevocationVersion;
     string public title;
     string public descriptionURI;
 
@@ -147,7 +150,19 @@ contract CharityCampaign {
         _entered = false;
     }
 
+    function isRevoked() public view returns (bool) {
+        return
+            !registry.isVerifiedCharity(charity) ||
+            registry.revocationVersion(charity) != creationRevocationVersion;
+    }
+
+    modifier campaignActive() {
+        require(!isRevoked(), "Campaign revoked: refunds available");
+        _;
+    }
+
     constructor(
+        address registry_,
         address charity_,
         string memory title_,
         string memory descriptionURI_,
@@ -158,22 +173,45 @@ contract CharityCampaign {
         uint256 approvalBps_,
         string[] memory categoryNames_
     ) {
+        require(registry_ != address(0), "Invalid registry");
+
+        CharityRegistry registryContract = CharityRegistry(registry_);
+
+        require(
+            registryContract.isVerifiedCharity(charity_),
+            "Charity not verified"
+        );
+
+        registry = registryContract;
+        creationRevocationVersion = registryContract.revocationVersion(
+            charity_
+        );
         require(charity_ != address(0), "Invalid charity");
         require(bytes(title_).length > 0, "Empty title");
-        require(fundingDeadline_ > block.timestamp, "Funding deadline not future");
-        require(campaignDeadline_ > fundingDeadline_, "Invalid campaign deadline");
+        require(
+            fundingDeadline_ > block.timestamp,
+            "Funding deadline not future"
+        );
+        require(
+            campaignDeadline_ > fundingDeadline_,
+            "Invalid campaign deadline"
+        );
         require(votingPeriod_ > 0, "Invalid voting period");
         require(
             fundingDeadline_ + votingPeriod_ <= campaignDeadline_,
             "Voting period too long"
         );
-        require(quorumBps_ > 0 && quorumBps_ <= BPS_DENOMINATOR, "Invalid quorum");
+        require(
+            quorumBps_ > 0 && quorumBps_ <= BPS_DENOMINATOR,
+            "Invalid quorum"
+        );
         require(
             approvalBps_ > 0 && approvalBps_ <= BPS_DENOMINATOR,
             "Invalid approval threshold"
         );
         require(
-            categoryNames_.length > 0 && categoryNames_.length <= MAX_CATEGORIES,
+            categoryNames_.length > 0 &&
+                categoryNames_.length <= MAX_CATEGORIES,
             "Invalid categories"
         );
 
@@ -206,8 +244,7 @@ contract CharityCampaign {
         return keccak256(bytes(name));
     }
 
-    function donate(bytes32 categoryId) external payable {
-        require(!closed, "Campaign closed");
+    function donate(bytes32 categoryId) external payable campaignActive {
         require(msg.sender != charity, "Charity cannot donate");
         require(block.timestamp < fundingDeadline, "Funding closed");
         require(msg.value >= minDonation, "Minimum donation is 0.01 ETH.");
@@ -245,8 +282,7 @@ contract CharityCampaign {
         string calldata description,
         string calldata evidenceURI,
         bytes32 evidenceHash
-    ) external onlyCharity returns (uint256 expenseId) {
-        require(!closed, "Campaign closed");
+    ) external onlyCharity campaignActive returns (uint256 expenseId) {
         require(block.timestamp >= fundingDeadline, "Funding still active");
         require(
             block.timestamp + votingPeriod <= campaignDeadline,
@@ -262,7 +298,8 @@ contract CharityCampaign {
         require(category.exists, "Unknown category");
         require(category.donorCount > 0, "No donors in category");
 
-        uint256 unreserved = category.availableBalance - category.reservedBalance;
+        uint256 unreserved = category.availableBalance -
+            category.reservedBalance;
         require(amount <= unreserved, "Insufficient category funds");
 
         category.reservedBalance += amount;
@@ -293,7 +330,10 @@ contract CharityCampaign {
     /**
      * @notice One donor address gets one oracle vote on an expense in a category they funded.
      */
-    function voteOnExpense(uint256 expenseId, bool support) external {
+    function voteOnExpense(
+        uint256 expenseId,
+        bool support
+    ) external campaignActive {
         Expense storage expense = _expenses[expenseId];
         require(expense.status == ExpenseStatus.Voting, "Expense not voting");
         require(block.timestamp < expense.voteEnd, "Voting ended");
@@ -319,7 +359,10 @@ contract CharityCampaign {
      * @notice A donor may publicly flag suspicious evidence and commit a hash of their reason.
      *         Raising a dispute does not itself decide the expense; the collective vote does.
      */
-    function raiseDispute(uint256 expenseId, bytes32 reasonHash) external {
+    function raiseDispute(
+        uint256 expenseId,
+        bytes32 reasonHash
+    ) external campaignActive {
         Expense storage expense = _expenses[expenseId];
         require(expense.status == ExpenseStatus.Voting, "Expense not voting");
         require(block.timestamp < expense.voteEnd, "Voting ended");
@@ -343,9 +386,7 @@ contract CharityCampaign {
      * 1. Participation quorum: enough distinct donors in that category voted.
      * 2. Approval ratio: enough of the votes cast were YES.
      */
-    function finalizeExpense(uint256 expenseId) external {
-        require(!closed, "Campaign closed");
-
+    function finalizeExpense(uint256 expenseId) external campaignActive {
         Expense storage expense = _expenses[expenseId];
         require(expense.status == ExpenseStatus.Voting, "Expense not voting");
         require(block.timestamp >= expense.voteEnd, "Voting still active");
@@ -353,11 +394,10 @@ contract CharityCampaign {
         Category storage category = _categories[expense.categoryId];
         uint256 totalVotes = expense.yesVotes + expense.noVotes;
 
-        bool quorumMet =
-            totalVotes * BPS_DENOMINATOR >= category.donorCount * quorumBps;
+        bool quorumMet = totalVotes * BPS_DENOMINATOR >=
+            category.donorCount * quorumBps;
 
-        bool approvalMet =
-            totalVotes > 0 &&
+        bool approvalMet = totalVotes > 0 &&
             expense.yesVotes * BPS_DENOMINATOR >= totalVotes * approvalBps;
 
         bool approved = quorumMet && approvalMet;
@@ -382,16 +422,26 @@ contract CharityCampaign {
      * @notice Anyone may execute an already approved payment. This prevents the charity from
      *         selectively delaying an expense after donors approved it.
      */
-    function executeExpense(uint256 expenseId) external nonReentrant {
-        require(!closed, "Campaign closed");
+    function executeExpense(
+        uint256 expenseId
+    ) external nonReentrant campaignActive {
         require(block.timestamp <= campaignDeadline, "Campaign expired");
 
         Expense storage expense = _expenses[expenseId];
-        require(expense.status == ExpenseStatus.Approved, "Expense not approved");
+        require(
+            expense.status == ExpenseStatus.Approved,
+            "Expense not approved"
+        );
 
         Category storage category = _categories[expense.categoryId];
-        require(category.reservedBalance >= expense.amount, "Funds not reserved");
-        require(category.availableBalance >= expense.amount, "Insufficient funds");
+        require(
+            category.reservedBalance >= expense.amount,
+            "Funds not reserved"
+        );
+        require(
+            category.availableBalance >= expense.amount,
+            "Insufficient funds"
+        );
 
         // Checks-effects-interactions
         expense.status = ExpenseStatus.Paid;
@@ -409,17 +459,25 @@ contract CharityCampaign {
      * @notice Ends the campaign after its deadline and snapshots all remaining category balances
      *         for pro-rata donor refunds. Approved but unexecuted expenses expire here.
      */
-    function closeCampaign() external {
+    function closeCampaign() external nonReentrant {
         require(!closed, "Campaign already closed");
-        require(block.timestamp > campaignDeadline, "Campaign still active");
+
+        require(
+            isRevoked() || block.timestamp > campaignDeadline,
+            "Campaign still active"
+        );
 
         closed = true;
+
         uint256 totalRefundable;
 
         for (uint256 i = 0; i < _categoryIds.length; i++) {
             Category storage category = _categories[_categoryIds[i]];
+
+            // Includes funds reserved for expenses that were never paid.
             category.refundPool = category.availableBalance;
             category.reservedBalance = 0;
+
             totalRefundable += category.refundPool;
         }
 
@@ -431,18 +489,20 @@ contract CharityCampaign {
      */
     function claimRefund(bytes32 categoryId) external nonReentrant {
         require(closed, "Campaign not closed");
-
         Category storage category = _categories[categoryId];
         require(category.exists, "Unknown category");
-        require(!refundClaimed[categoryId][msg.sender], "Refund already claimed");
+        require(
+            !refundClaimed[categoryId][msg.sender],
+            "Refund already claimed"
+        );
 
         uint256 contribution = categoryContribution[categoryId][msg.sender];
         require(contribution > 0, "No contribution");
 
         refundClaimed[categoryId][msg.sender] = true;
 
-        uint256 amount =
-            (contribution * category.refundPool) / category.totalDonated;
+        uint256 amount = (contribution * category.refundPool) /
+            category.totalDonated;
 
         require(amount > 0, "Nothing refundable");
         category.availableBalance -= amount;
@@ -453,7 +513,9 @@ contract CharityCampaign {
         emit RefundClaimed(msg.sender, categoryId, amount);
     }
 
-    function getCategory(bytes32 categoryId) external view returns (Category memory) {
+    function getCategory(
+        bytes32 categoryId
+    ) external view returns (Category memory) {
         require(_categories[categoryId].exists, "Unknown category");
         return _categories[categoryId];
     }
@@ -462,8 +524,13 @@ contract CharityCampaign {
         return _categoryIds;
     }
 
-    function getExpense(uint256 expenseId) external view returns (Expense memory) {
-        require(_expenses[expenseId].status != ExpenseStatus.None, "Unknown expense");
+    function getExpense(
+        uint256 expenseId
+    ) external view returns (Expense memory) {
+        require(
+            _expenses[expenseId].status != ExpenseStatus.None,
+            "Unknown expense"
+        );
         return _expenses[expenseId];
     }
 

@@ -46,6 +46,7 @@ const CAMPAIGN_ABI = [
   "function executeExpense(uint256 expenseId)",
   "function closeCampaign()",
   "function claimRefund(bytes32 categoryId)",
+  "function isRevoked() view returns (bool)",
 ];
 
 const STATUS_NAMES = ["None", "Voting", "Approved", "Rejected", "Paid"];
@@ -262,7 +263,13 @@ async function updateCharityVerification(verified) {
   await runTransaction(
     verified ? "Verify charity" : "Remove charity verification",
     () => registry.setVerifiedCharity(address, verified),
-    loadFactory,
+    async () => {
+      await loadFactory();
+
+      if (selectedCampaign) {
+        await refreshSelectedCampaign();
+      }
+    },
   );
 }
 
@@ -310,8 +317,20 @@ async function refreshCampaigns() {
 
     for (const address of addresses) {
       const campaign = new ethers.Contract(address, CAMPAIGN_ABI, signer);
-      const [title, charity, totalDonated, totalSpent, closed] = await Promise.all([
-        campaign.title(), campaign.charity(), campaign.totalDonated(), campaign.totalSpent(), campaign.closed(),
+      const [
+        title,
+        charity,
+        totalDonated,
+        totalSpent,
+        closed,
+        revoked,
+      ] = await Promise.all([
+        campaign.title(),
+        campaign.charity(),
+        campaign.totalDonated(),
+        campaign.totalSpent(),
+        campaign.closed(),
+        campaign.isRevoked(),
       ]);
       const item = document.createElement("article");
       item.className = "campaign-item";
@@ -323,7 +342,7 @@ async function refreshCampaigns() {
             <span>Charity ${shortAddress(charity)}</span>
             <span>${formatEth(totalDonated)} donated</span>
             <span>${formatEth(totalSpent)} spent</span>
-            <span>${closed ? "Closed" : "Active"}</span>
+            <span>${closed ? "Closed — refunds available" : revoked ? "Revoked — close for refunds" : "Active"}</span>
           </div>
         </div>
         <button class="button primary">Open</button>`;
@@ -393,7 +412,17 @@ async function refreshSelectedCampaign() {
     $("selectedCampaignAddress").textContent = selectedCampaignAddress;
 
     const now = await refreshBlockTime();
-    const phase = closed ? "Closed" : now < Number(fundingDeadline) ? "Funding" : now <= Number(campaignDeadline) ? "Spending / voting" : "Expired — ready to close";
+    const revoked = await selectedCampaign.isRevoked();
+
+    const phase = closed
+      ? "Closed — claim any remaining refund"
+      : revoked
+        ? "Revoked — close this campaign to enable refunds"
+        : now < Number(fundingDeadline)
+          ? "Funding"
+          : now <= Number(campaignDeadline)
+            ? "Spending / voting"
+            : "Expired — ready to close";
     $("campaignStats").innerHTML = [
       ["Phase", phase],
       ["Total donated", formatEth(totalDonated)],
@@ -412,6 +441,11 @@ async function refreshSelectedCampaign() {
     renderCategories(categories);
     populateCategorySelects(categories);
     await renderExpenses(Number(expenseCount), now);
+    $("donateBtn").disabled = closed || revoked;
+    $("proposeExpenseBtn").disabled = closed || revoked;
+    $("closeCampaignBtn").disabled =
+      closed || (!revoked && now <= Number(campaignDeadline));
+    $("claimRefundBtn").disabled = !closed;
   } catch (error) {
     setStatus(getErrorMessage(error), "error");
   }
@@ -582,7 +616,15 @@ async function expenseAction(label, action) {
 
 async function closeCampaign() {
   if (!selectedCampaign) return;
-  await runTransaction("Close campaign", () => selectedCampaign.closeCampaign(), refreshSelectedCampaign);
+
+  await runTransaction(
+    "Close campaign",
+    () => selectedCampaign.closeCampaign(),
+    async () => {
+      await refreshSelectedCampaign();
+      await refreshCampaigns();
+    },
+  );
 }
 
 async function claimRefund() {

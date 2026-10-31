@@ -13,6 +13,8 @@ pragma solidity ^0.8.34;
 contract CharityRegistry {
     address public admin;
     mapping(address => bool) private _verifiedCharities;
+    // Increases whenever a verified charity loses verification.
+    mapping(address => uint256) public revocationVersion;
 
     event CharityVerificationUpdated(address indexed charity, bool verified);
     event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
@@ -26,9 +28,18 @@ contract CharityRegistry {
         admin = msg.sender;
     }
 
-    function setVerifiedCharity(address charity, bool verified) external onlyAdmin {
+    function setVerifiedCharity(
+        address charity,
+        bool verified
+    ) external onlyAdmin {
         require(charity != address(0), "Invalid charity");
+
+        if (_verifiedCharities[charity] && !verified) {
+            revocationVersion[charity] += 1;
+        }
+
         _verifiedCharities[charity] = verified;
+
         emit CharityVerificationUpdated(charity, verified);
     }
 

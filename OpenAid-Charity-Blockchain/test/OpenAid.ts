@@ -562,4 +562,104 @@ describe("OpenAid charity donation platform", function () {
       );
     });
   });
+  
+  describe("Charity revocation", function () {
+    it("allows early closure and refunds after revocation", async function () {
+      const { registry, charity, campaign, donor1, donor2 } =
+        await networkHelpers.loadFixture(deployFixture);
+
+      await campaign.connect(donor1).donate(FOOD, {
+        value: ethers.parseEther("3"),
+      });
+
+      await campaign.connect(donor2).donate(FOOD, {
+        value: ethers.parseEther("1"),
+      });
+
+      // A verified campaign cannot close before its deadline.
+      await expect(campaign.closeCampaign())
+        .to.be.revertedWith("Campaign still active");
+
+      // The default registry signer is the admin.
+      await registry.setVerifiedCharity(charity.address, false);
+
+      expect(await campaign.isRevoked()).to.equal(true);
+
+      await expect(
+        campaign.connect(donor1).donate(FOOD, {
+          value: ethers.parseEther("0.01"),
+        }),
+      ).to.be.revertedWith("Campaign revoked: refunds available");
+
+      // Any account can close the revoked campaign.
+      await campaign.connect(donor1).closeCampaign();
+
+      expect(await campaign.closed()).to.equal(true);
+
+      await expect(
+        campaign.connect(donor1).claimRefund(FOOD),
+      ).to.changeEtherBalance(
+        ethers,
+        donor1,
+        ethers.parseEther("3"),
+      );
+
+      await expect(
+        campaign.connect(donor2).claimRefund(FOOD),
+      ).to.changeEtherBalance(
+        ethers,
+        donor2,
+        ethers.parseEther("1"),
+      );
+
+      await expect(
+        campaign.connect(donor1).claimRefund(FOOD),
+      ).to.be.revertedWith("Refund already claimed");
+    });
+
+    it("blocks approved payments and does not revive old campaigns", async function () {
+      const { registry, charity, campaign, donor1, donor2 } =
+        await createFoodExpense();
+
+      await campaign.connect(donor1).voteOnExpense(1n, true);
+      await campaign.connect(donor2).voteOnExpense(1n, true);
+
+      const expense = await campaign.getExpense(1n);
+
+      await networkHelpers.time.increaseTo(Number(expense.voteEnd));
+      await campaign.finalizeExpense(1n);
+
+      await registry.setVerifiedCharity(charity.address, false);
+
+      await expect(
+        campaign.executeExpense(1n),
+      ).to.be.revertedWith("Campaign revoked: refunds available");
+
+      // Re-verification must not revive this existing campaign.
+      await registry.setVerifiedCharity(charity.address, true);
+
+      expect(await registry.isVerifiedCharity(charity.address)).to.equal(true);
+      expect(await campaign.isRevoked()).to.equal(true);
+
+      await expect(
+        campaign.executeExpense(1n),
+      ).to.be.revertedWith("Campaign revoked: refunds available");
+
+      await campaign.closeCampaign();
+
+      const food = await campaign.getCategory(FOOD);
+
+      // All 6 ETH remain because the approved expense was never paid.
+      expect(food.refundPool).to.equal(ethers.parseEther("6"));
+      expect(food.reservedBalance).to.equal(0n);
+
+      await expect(
+        campaign.connect(donor1).claimRefund(FOOD),
+      ).to.changeEtherBalance(
+        ethers,
+        donor1,
+        ethers.parseEther("3"),
+      );
+    });
+  });
 });

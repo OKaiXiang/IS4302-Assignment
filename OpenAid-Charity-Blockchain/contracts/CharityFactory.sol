@@ -25,36 +25,37 @@ contract CharityFactory {
         registry = CharityRegistry(registryAddress);
     }
 
-   function createCampaign(
-    string calldata title,
-    string calldata descriptionURI,
-    uint256 fundingDeadline,
-    uint256 campaignDeadline,
-    uint256 votingPeriod,
-    uint256 quorumBps,
-    uint256 approvalBps,
-    string[] calldata categoryNames
-) external returns (address campaignAddress) {
-    require(registry.isVerifiedCharity(msg.sender), "Charity not verified");
+    function createCampaign(
+        string calldata title,
+        string calldata descriptionURI,
+        uint256 fundingDeadline,
+        uint256 campaignDeadline,
+        uint256 votingPeriod,
+        uint256 quorumBps,
+        uint256 approvalBps,
+        string[] calldata categoryNames
+    ) external returns (address campaignAddress) {
+        require(registry.isVerifiedCharity(msg.sender), "Charity not verified");
 
-    CharityCampaign campaign = new CharityCampaign(
-        msg.sender,
-        title,
-        descriptionURI,
-        fundingDeadline,
-        campaignDeadline,
-        votingPeriod,
-        quorumBps,
-        approvalBps,
-        categoryNames
-    );
+        CharityCampaign campaign = new CharityCampaign(
+            address(registry),
+            msg.sender,
+            title,
+            descriptionURI,
+            fundingDeadline,
+            campaignDeadline,
+            votingPeriod,
+            quorumBps,
+            approvalBps,
+            categoryNames
+        );
 
-    campaignAddress = address(campaign);
-    _campaigns.push(campaignAddress);
-    _campaignsByCharity[msg.sender].push(campaignAddress);
+        campaignAddress = address(campaign);
+        _campaigns.push(campaignAddress);
+        _campaignsByCharity[msg.sender].push(campaignAddress);
 
-    emit CampaignCreated(campaignAddress, msg.sender, title);
-}
+        emit CampaignCreated(campaignAddress, msg.sender, title);
+    }
 
     function getCampaigns() external view returns (address[] memory) {
         return _campaigns;
