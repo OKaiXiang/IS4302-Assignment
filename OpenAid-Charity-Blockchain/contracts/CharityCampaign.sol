@@ -52,6 +52,12 @@ contract CharityCampaign {
         ExpenseStatus status;
     }
 
+    struct Dispute {
+        address donor;
+        string reason;
+        uint256 timestamp;
+    }
+
     address public immutable charity;
     CharityRegistry public immutable registry;
     uint256 public immutable creationRevocationVersion;
@@ -86,6 +92,8 @@ contract CharityCampaign {
     mapping(bytes32 => mapping(address => bool)) public refundClaimed;
 
     mapping(uint256 => Expense) private _expenses;
+
+    mapping(uint256 => Dispute[]) private _disputes;
 
     bool private _entered;
 
@@ -359,24 +367,57 @@ contract CharityCampaign {
      * @notice A donor may publicly flag suspicious evidence and commit a hash of their reason.
      *         Raising a dispute does not itself decide the expense; the collective vote does.
      */
+    /**
+     * @notice Records a publicly readable dispute reason.
+     *         A dispute does not automatically reject an expense.
+     */
     function raiseDispute(
         uint256 expenseId,
-        bytes32 reasonHash
+        string calldata reason
     ) external campaignActive {
         Expense storage expense = _expenses[expenseId];
+
         require(expense.status == ExpenseStatus.Voting, "Expense not voting");
         require(block.timestamp < expense.voteEnd, "Voting ended");
-        require(reasonHash != bytes32(0), "Missing reason hash");
+
+        require(bytes(reason).length > 0, "Missing dispute reason");
+        require(bytes(reason).length <= 1024, "Dispute reason too long");
+
         require(
             categoryContribution[expense.categoryId][msg.sender] > 0,
             "Not a category donor"
         );
+
         require(!hasRaisedDispute[expenseId][msg.sender], "Already disputed");
 
         hasRaisedDispute[expenseId][msg.sender] = true;
+
+        _disputes[expenseId].push(
+            Dispute({
+                donor: msg.sender,
+                reason: reason,
+                timestamp: block.timestamp
+            })
+        );
+
         expense.disputeCount += 1;
 
-        emit DisputeRaised(expenseId, msg.sender, reasonHash);
+        // Preserve the existing event and calculate its hash on-chain.
+        emit DisputeRaised(expenseId, msg.sender, keccak256(bytes(reason)));
+    }
+
+    function getDispute(
+        uint256 expenseId,
+        uint256 disputeIndex
+    ) external view returns (Dispute memory) {
+        require(
+            _expenses[expenseId].status != ExpenseStatus.None,
+            "Unknown expense"
+        );
+
+        require(disputeIndex < _disputes[expenseId].length, "Unknown dispute");
+
+        return _disputes[expenseId][disputeIndex];
     }
 
     /**

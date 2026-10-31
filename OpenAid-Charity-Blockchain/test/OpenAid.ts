@@ -385,17 +385,57 @@ describe("OpenAid charity donation platform", function () {
       ).to.be.revertedWith("Already voted");
     });
 
-    it("lets donors raise a transparent dispute without giving one donor veto power", async function () {
-      const { campaign, donor1 } = await createFoodExpense();
-      const reasonHash = evidenceHash("Invoice appears inconsistent");
+    it("stores readable disputes without giving one donor veto power", async function () {
+      const { campaign, donor1, donor2, outsider } =
+        await createFoodExpense();
 
-      await expect(campaign.connect(donor1).raiseDispute(1n, reasonHash))
+      const reason = "Invoice appears inconsistent";
+      const reasonHash = evidenceHash(reason);
+
+      await expect(
+        campaign.connect(donor1).raiseDispute(1n, reason),
+      )
         .to.emit(campaign, "DisputeRaised")
         .withArgs(1n, donor1.address, reasonHash);
 
       const expense = await campaign.getExpense(1n);
+
       expect(expense.disputeCount).to.equal(1n);
-      expect(expense.status).to.equal(1n); // still Voting: dispute alone is not a veto
+      expect(expense.status).to.equal(1n); // Still Voting.
+
+      // Another donor can read the original text.
+      const dispute = await campaign.connect(donor2).getDispute(1n, 0n);
+
+      expect(dispute.donor).to.equal(donor1.address);
+      expect(dispute.reason).to.equal(reason);
+      expect(dispute.timestamp).to.be.greaterThan(0n);
+
+      // Reading is public, but submitting still requires category membership.
+      const publicDispute = await campaign.connect(outsider).getDispute(1n, 0n);
+      expect(publicDispute.reason).to.equal(reason);
+
+      await expect(
+        campaign.connect(outsider).raiseDispute(1n, "Another concern"),
+      ).to.be.revertedWith("Not a category donor");
+
+      await expect(
+        campaign.connect(donor1).raiseDispute(1n, "Second dispute"),
+      ).to.be.revertedWith("Already disputed");
+
+      await expect(
+        campaign.connect(donor2).raiseDispute(1n, ""),
+      ).to.be.revertedWith("Missing dispute reason");
+
+      await expect(
+        campaign.connect(donor2).raiseDispute(1n, "a".repeat(1025)),
+      ).to.be.revertedWith("Dispute reason too long");
+
+      // Disputes remain readable after voting ends.
+      await networkHelpers.time.increaseTo(Number(expense.voteEnd));
+
+      expect(
+        (await campaign.connect(donor2).getDispute(1n, 0n)).reason,
+      ).to.equal(reason);
     });
 
     it("approves an expense only when quorum and approval threshold are both met", async function () {
@@ -562,7 +602,7 @@ describe("OpenAid charity donation platform", function () {
       );
     });
   });
-  
+
   describe("Charity revocation", function () {
     it("allows early closure and refunds after revocation", async function () {
       const { registry, charity, campaign, donor1, donor2 } =

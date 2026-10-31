@@ -41,7 +41,8 @@ const CAMPAIGN_ABI = [
   "function donate(bytes32 categoryId) payable",
   "function proposeExpense(bytes32 categoryId,address recipient,uint256 amount,string description,string evidenceURI,bytes32 evidenceHash) returns (uint256 expenseId)",
   "function voteOnExpense(uint256 expenseId,bool support)",
-  "function raiseDispute(uint256 expenseId,bytes32 reasonHash)",
+  "function raiseDispute(uint256 expenseId,string reason)",
+  "function getDispute(uint256 expenseId,uint256 disputeIndex) view returns (tuple(address donor,string reason,uint256 timestamp))",
   "function finalizeExpense(uint256 expenseId)",
   "function executeExpense(uint256 expenseId)",
   "function closeCampaign()",
@@ -528,6 +529,46 @@ async function proposeExpense() {
   );
 }
 
+async function renderDisputes(campaign, expenseId, disputeCount, expenseNode) {
+  const section = document.createElement("section");
+  section.className = "dispute-section";
+
+  const heading = document.createElement("h4");
+  heading.textContent = `Disputes (${disputeCount})`;
+  section.appendChild(heading);
+
+  if (disputeCount === 0) {
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "No disputes have been raised.";
+    section.appendChild(empty);
+  } else {
+    for (let index = 0; index < disputeCount; index++) {
+      const dispute = await campaign.getDispute(expenseId, index);
+
+      const card = document.createElement("article");
+      card.className = "dispute-card";
+
+      const author = document.createElement("p");
+      author.className = "dispute-author";
+      author.textContent = `Raised by: ${dispute.donor}`;
+
+      const date = document.createElement("p");
+      date.className = "hint";
+      date.textContent = `Submitted: ${formatDate(dispute.timestamp)}`;
+
+      const reason = document.createElement("p");
+      reason.className = "dispute-reason";
+      reason.textContent = dispute.reason;
+
+      card.append(author, date, reason);
+      section.appendChild(card);
+    }
+  }
+
+  expenseNode.appendChild(section);
+}
+
 async function renderExpenses(count, now) {
   const container = $("expenseList");
   container.innerHTML = "";
@@ -577,12 +618,40 @@ async function renderExpenses(count, now) {
       actions.appendChild(actionButton("Vote YES", "primary", () => expenseAction(`Vote YES on #${id}`, () => selectedCampaign.voteOnExpense(id, true))));
       actions.appendChild(actionButton("Vote NO", "danger", () => expenseAction(`Vote NO on #${id}`, () => selectedCampaign.voteOnExpense(id, false))));
     }
-    if (Number(expense.status) === 1 && now < Number(expense.voteEnd) && contribution > 0n && !disputed) {
-      actions.appendChild(actionButton("Raise dispute", "secondary", async () => {
-        const reason = prompt("Brief dispute reason (stored as a hash on-chain):");
-        if (!reason) return;
-        await expenseAction(`Dispute expense #${id}`, () => selectedCampaign.raiseDispute(id, toEvidenceHash(reason)));
-      }));
+    if (
+      Number(expense.status) === 1 &&
+      now < Number(expense.voteEnd) &&
+      contribution > 0n &&
+      !disputed
+    ) {
+      actions.appendChild(
+        actionButton("Raise dispute", "secondary", async () => {
+          const input = prompt(
+            "Explain your dispute. This text will be public on-chain. " +
+            "Do not include personal or confidential information."
+          );
+
+          if (input === null) return;
+
+          const reason = input.trim();
+
+          if (!reason) {
+            return setStatus("Enter a dispute reason.", "error");
+          }
+
+          if (ethers.toUtf8Bytes(reason).length > 1024) {
+            return setStatus(
+              "Dispute reason must be no more than 1,024 UTF-8 bytes.",
+              "error"
+            );
+          }
+
+          await expenseAction(
+            `Dispute expense #${id}`,
+            () => selectedCampaign.raiseDispute(id, reason)
+          );
+        })
+      );
     }
     if (Number(expense.status) === 1 && now >= Number(expense.voteEnd)) {
       actions.appendChild(actionButton("Finalize vote", "secondary", () => expenseAction(`Finalize expense #${id}`, () => selectedCampaign.finalizeExpense(id))));
@@ -598,6 +667,13 @@ async function renderExpenses(count, now) {
       actions.appendChild(note);
     }
 
+    await renderDisputes(
+      selectedCampaign,
+      id,
+      Number(expense.disputeCount),
+      node
+    );
+    
     container.appendChild(node);
   }
 }
