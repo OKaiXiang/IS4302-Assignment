@@ -6,5 +6,5 @@ export type { CharityFactory } from './CharityFactory.js';
 export type { CharityRegistry } from './CharityRegistry.js';
 export * as factories from './factories/index.js';
 export { CharityCampaign__factory } from './factories/CharityCampaign__factory.js';
-export { CharityRegistry__factory } from './factories/CharityRegistry__factory.js';
 export { CharityFactory__factory } from './factories/CharityFactory__factory.js';
+export { CharityRegistry__factory } from './factories/CharityRegistry__factory.js';

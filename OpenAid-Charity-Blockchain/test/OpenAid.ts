@@ -38,7 +38,7 @@ describe("OpenAid charity donation platform", function () {
     const fundingDeadline = block.timestamp + 1_000;
     const votingPeriod = 1_000;
     const campaignDeadline = block.timestamp + 10_000;
-    const minDonation = ethers.parseEther("0.1");
+    const minDonation = ethers.parseEther("0.01");
 
     await factory.connect(charity).createCampaign(
       "Flood Relief 2026",
@@ -48,7 +48,6 @@ describe("OpenAid charity donation platform", function () {
       votingPeriod,
       BPS_50_PERCENT,
       BPS_60_PERCENT,
-      minDonation,
       ["Food", "Medical"],
     );
 
@@ -137,7 +136,6 @@ describe("OpenAid charity donation platform", function () {
           votingPeriod,
           BPS_50_PERCENT,
           BPS_60_PERCENT,
-          ethers.parseEther("0.1"),
           ["Food"],
         ),
       ).to.be.revertedWith("Charity not verified");
@@ -206,9 +204,9 @@ describe("OpenAid charity donation platform", function () {
 
       await expect(
         campaign.connect(donor1).donate(FOOD, {
-          value: ethers.parseEther("0.01"),
+          value: ethers.parseEther("0.009"),
         }),
-      ).to.be.revertedWith("Donation below minimum");
+      ).to.be.revertedWith("Minimum donation is 0.01 ETH.");
 
       await expect(
         donor1.sendTransaction({
@@ -248,6 +246,33 @@ describe("OpenAid charity donation platform", function () {
           evidenceHash("proof"),
         ),
       ).to.be.revertedWith("Insufficient category funds");
+    });
+
+    it("accepts exactly the fixed minimum of 0.01 ETH", async function () {
+      const { campaign, donor1, minDonation } =
+        await networkHelpers.loadFixture(deployFixture);
+
+      expect(await campaign.minDonation()).to.equal(minDonation);
+
+      await expect(
+        campaign.connect(donor1).donate(FOOD, { value: minDonation }),
+      )
+        .to.emit(campaign, "DonationReceived")
+        .withArgs(donor1.address, FOOD, minDonation);
+    });
+
+    it("rejects zero and one wei below the minimum", async function () {
+      const { campaign, donor1, minDonation } =
+        await networkHelpers.loadFixture(deployFixture);
+
+      for (const value of [0n, minDonation - 1n]) {
+        await expect(
+          campaign.connect(donor1).donate(FOOD, { value }),
+        ).to.be.revertedWith("Minimum donation is 0.01 ETH.");
+      }
+
+      expect(await campaign.totalDonated()).to.equal(0n);
+      expect(await campaign.totalUniqueDonors()).to.equal(0n);
     });
   });
 

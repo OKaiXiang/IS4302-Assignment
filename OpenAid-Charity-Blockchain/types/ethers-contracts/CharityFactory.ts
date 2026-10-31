@@ -10,7 +10,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
 
     getEvent(nameOrSignatureOrTopic: "CampaignCreated"): EventFragment;
 
-    encodeFunctionData(functionFragment: 'createCampaign', values: [string, string, BigNumberish, BigNumberish, BigNumberish, BigNumberish, BigNumberish, BigNumberish, string[]]): string;
+    encodeFunctionData(functionFragment: 'createCampaign', values: [string, string, BigNumberish, BigNumberish, BigNumberish, BigNumberish, BigNumberish, string[]]): string;
 encodeFunctionData(functionFragment: 'getCampaignCount', values?: undefined): string;
 encodeFunctionData(functionFragment: 'getCampaigns', values?: undefined): string;
 encodeFunctionData(functionFragment: 'getCampaignsByCharity', values: [AddressLike]): string;
@@ -71,7 +71,7 @@ decodeFunctionResult(functionFragment: 'registry', data: BytesLike): Result;
     
     
     createCampaign: TypedContractMethod<
-      [title: string, descriptionURI: string, fundingDeadline: BigNumberish, campaignDeadline: BigNumberish, votingPeriod: BigNumberish, quorumBps: BigNumberish, approvalBps: BigNumberish, minDonation: BigNumberish, categoryNames: string[], ],
+      [title: string, descriptionURI: string, fundingDeadline: BigNumberish, campaignDeadline: BigNumberish, votingPeriod: BigNumberish, quorumBps: BigNumberish, approvalBps: BigNumberish, categoryNames: string[], ],
       [string],
       'nonpayable'
     >
@@ -113,7 +113,7 @@ decodeFunctionResult(functionFragment: 'registry', data: BytesLike): Result;
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
     getFunction(nameOrSignature: 'createCampaign'): TypedContractMethod<
-      [title: string, descriptionURI: string, fundingDeadline: BigNumberish, campaignDeadline: BigNumberish, votingPeriod: BigNumberish, quorumBps: BigNumberish, approvalBps: BigNumberish, minDonation: BigNumberish, categoryNames: string[], ],
+      [title: string, descriptionURI: string, fundingDeadline: BigNumberish, campaignDeadline: BigNumberish, votingPeriod: BigNumberish, quorumBps: BigNumberish, approvalBps: BigNumberish, categoryNames: string[], ],
       [string],
       'nonpayable'
     >;

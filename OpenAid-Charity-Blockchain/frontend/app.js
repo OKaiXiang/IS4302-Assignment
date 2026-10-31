@@ -1,5 +1,8 @@
 import { ethers } from "ethers";
 
+const MIN_DONATION = ethers.parseEther("0.01");
+const MIN_DONATION_MESSAGE = "Minimum donation is 0.01 ETH.";
+
 const FACTORY_ABI = [
   "function registry() view returns (address)",
   "function getCampaigns() view returns (address[])",
@@ -121,7 +124,12 @@ function getErrorMessage(error) {
     error?.reason,
     error?.info?.error?.message,
     error?.message,
-  ].filter(Boolean);
+  ].filter((message) => typeof message === "string" && message.length > 0);
+
+  if (candidates.some((message) => message.includes(MIN_DONATION_MESSAGE))) {
+    return MIN_DONATION_MESSAGE;
+  }
+
   const raw = candidates[0] || "Unknown transaction error";
   return raw.replace(/^execution reverted:\s*/i, "");
 }
@@ -280,7 +288,6 @@ async function createCampaign() {
     Math.round(votingMinutes * 60),
     Math.round(Number($("quorumPercent").value) * 100),
     Math.round(Number($("approvalPercent").value) * 100),
-    ethers.parseEther($("minDonation").value),
     categories,
   ];
 
@@ -438,12 +445,32 @@ function populateCategorySelects(categories) {
 
 async function donate() {
   if (!selectedCampaign) return;
+
   const categoryId = $("donateCategory").value;
-  const amount = ethers.parseEther($("donationAmount").value);
-  await runTransaction("Donate", () => selectedCampaign.donate(categoryId, { value: amount }), async () => {
-    await refreshSelectedCampaign();
-    await refreshCampaigns();
-  });
+
+  let amount;
+
+  try {
+    amount = ethers.parseEther($("donationAmount").value.trim());
+  } catch {
+    return setStatus(
+      "Enter a valid donation amount in ETH. " + MIN_DONATION_MESSAGE,
+      "error",
+    );
+  }
+
+  if (amount < MIN_DONATION) {
+    return setStatus(MIN_DONATION_MESSAGE, "error");
+  }
+
+  await runTransaction(
+    "Donate",
+    () => selectedCampaign.donate(categoryId, { value: amount }),
+    async () => {
+      await refreshSelectedCampaign();
+      await refreshCampaigns();
+    },
+  );
 }
 
 async function proposeExpense() {

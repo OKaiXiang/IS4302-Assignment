@@ -60,7 +60,7 @@ contract CharityCampaign {
     uint256 public immutable votingPeriod;
     uint256 public immutable quorumBps;
     uint256 public immutable approvalBps;
-    uint256 public immutable minDonation;
+    uint256 public constant minDonation = 0.01 ether;
 
     uint256 public totalDonated;
     uint256 public totalSpent;
@@ -156,7 +156,6 @@ contract CharityCampaign {
         uint256 votingPeriod_,
         uint256 quorumBps_,
         uint256 approvalBps_,
-        uint256 minDonation_,
         string[] memory categoryNames_
     ) {
         require(charity_ != address(0), "Invalid charity");
@@ -173,7 +172,6 @@ contract CharityCampaign {
             approvalBps_ > 0 && approvalBps_ <= BPS_DENOMINATOR,
             "Invalid approval threshold"
         );
-        require(minDonation_ > 0, "Invalid minimum donation");
         require(
             categoryNames_.length > 0 && categoryNames_.length <= MAX_CATEGORIES,
             "Invalid categories"
@@ -187,7 +185,6 @@ contract CharityCampaign {
         votingPeriod = votingPeriod_;
         quorumBps = quorumBps_;
         approvalBps = approvalBps_;
-        minDonation = minDonation_;
 
         for (uint256 i = 0; i < categoryNames_.length; i++) {
             string memory name = categoryNames_[i];
@@ -213,7 +210,7 @@ contract CharityCampaign {
         require(!closed, "Campaign closed");
         require(msg.sender != charity, "Charity cannot donate");
         require(block.timestamp < fundingDeadline, "Funding closed");
-        require(msg.value >= minDonation, "Donation below minimum");
+        require(msg.value >= minDonation, "Minimum donation is 0.01 ETH.");
 
         Category storage category = _categories[categoryId];
         require(category.exists, "Unknown category");
