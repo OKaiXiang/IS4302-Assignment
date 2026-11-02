@@ -1,6 +1,6 @@
-# OpenAid — Transparent Charity Donation Prototype
+# OpenAi — Transparent Charity Donation Prototype
 
-OpenAid is a Hardhat 3 + Ethers.js smart-contract prototype for transparent charity donations.
+OpenAi is a Hardhat 3 + Ethers.js smart-contract prototype for transparent charity donations.
 
 ## Core model
 
