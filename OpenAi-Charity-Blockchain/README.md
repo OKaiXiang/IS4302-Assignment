@@ -41,10 +41,10 @@ contracts/
   CharityCampaign.sol
 
 test/
-  OpenAid.ts
+  OpenAi.ts
 
 ignition/modules/
-  OpenAid.ts
+  OpenAi.ts
 
 hardhat.config.ts
 package.json
@@ -145,7 +145,7 @@ Keep this terminal running. The frontend talks directly to this node on port `85
 **Terminal 2 — deploy contracts and configure frontend**
 
 ```bash
-npx hardhat ignition deploy ignition/modules/OpenAid.ts --network localhost
+npx hardhat ignition deploy ignition/modules/OpenAi.ts --network localhost
 npm run frontend:config
 ```
 

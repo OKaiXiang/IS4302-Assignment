@@ -139,7 +139,7 @@ function getErrorMessage(error) {
 async function connectLocalHardhat() {
   try {
     setStatus("Connecting directly to Hardhat localhost…");
-    provider = new ethers.JsonRpcProvider(window.OPENAID_CONFIG?.rpcUrl || RPC_URL);
+    provider = new ethers.JsonRpcProvider(window.OPENAI_CONFIG?.rpcUrl || RPC_URL);
     const network = await provider.getNetwork();
     if (network.chainId !== HARDHAT_CHAIN_ID) {
       throw new Error(`Expected Hardhat chain 31337, but RPC returned chain ${network.chainId}.`);
@@ -219,7 +219,7 @@ async function loadFactory() {
     if (!ethers.isAddress(value)) throw new Error("Enter a valid factory contract address.");
 
     factoryAddress = ethers.getAddress(value);
-    localStorage.setItem("openaid.factoryAddress", factoryAddress);
+    localStorage.setItem("openai.factoryAddress", factoryAddress);
     factory = new ethers.Contract(factoryAddress, FACTORY_ABI, signer);
 
     const code = await provider.getCode(factoryAddress);
@@ -233,7 +233,7 @@ async function loadFactory() {
     const verified = await registry.isVerifiedCharity(account);
     $("adminInfo").textContent = `Registry admin: ${admin}. Current wallet verified as charity: ${verified ? "yes" : "no"}.`;
 
-    setStatus(`Loaded OpenAid factory ${shortAddress(factoryAddress)}.`, "success");
+    setStatus(`Loaded OpenAi factory ${shortAddress(factoryAddress)}.`, "success");
     await refreshCampaigns();
   } catch (error) {
     factory = undefined;
@@ -736,7 +736,7 @@ $("proposeExpenseBtn").addEventListener("click", proposeExpense);
 $("closeCampaignBtn").addEventListener("click", closeCampaign);
 $("claimRefundBtn").addEventListener("click", claimRefund);
 
-const configuredAddress = window.OPENAID_CONFIG?.factoryAddress || localStorage.getItem("openaid.factoryAddress") || "";
+const configuredAddress = window.OPENAI_CONFIG?.factoryAddress || localStorage.getItem("openai.factoryAddress") || "";
 if (configuredAddress) $("factoryAddressInput").value = configuredAddress;
 
 connectLocalHardhat();

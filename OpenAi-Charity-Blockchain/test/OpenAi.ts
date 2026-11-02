@@ -12,7 +12,7 @@ const MEDICAL = ethers.id("Medical");
 const evidenceHash = (text: string) =>
   ethers.keccak256(ethers.toUtf8Bytes(text));
 
-describe("OpenAid charity donation platform", function () {
+describe("OpenAi charity donation platform", function () {
   async function deployFixture() {
     const [
       admin,
